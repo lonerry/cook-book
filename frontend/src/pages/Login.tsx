@@ -19,7 +19,9 @@ export default function Login() {
       dispatch(setToken(res.data.access_token))
       navigate('/profile')
     } catch (e: any) {
-      setError(e?.response?.data?.detail || 'Ошибка входа')
+      const d = e?.response?.data?.detail
+      const msg = typeof d === 'string' ? d : (d?.message || 'Неверный email или пароль')
+      setError(msg)
     }
   }
 

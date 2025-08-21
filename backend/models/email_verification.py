@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from sqlalchemy import Boolean, Column, DateTime, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship
@@ -14,11 +14,7 @@ class EmailVerification(Base):
         Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     code = Column(String(10), nullable=False, index=True)
-    expires_at = Column(
-        DateTime,
-        default=lambda: datetime.now(timezone.utc) + timedelta(minutes=15),
-        nullable=False,
-    )
+    expires_at = Column(DateTime, default=lambda: datetime.utcnow() + timedelta(minutes=15), nullable=False)
     consumed = Column(Boolean, default=False, nullable=False)
 
     user = relationship("User")

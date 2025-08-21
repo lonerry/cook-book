@@ -1,5 +1,4 @@
 import sqlalchemy as sa
-
 from alembic import op
 
 # Keep revision id <= 32 chars to fit alembic_version.version_num

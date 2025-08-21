@@ -132,7 +132,14 @@ export default function Home() {
         key={`${topicFilter}-${order}-${q}`}
         className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 pb-10"
       >
-        {items.map(r => (
+        {items.length === 0 ? (
+          <div className="col-span-full">
+            <div className="h-48 border rounded-lg bg-white flex items-center justify-center text-neutral-500">
+              В этой категории пока нет рецептов
+            </div>
+          </div>
+        ) : (
+        items.map(r => (
           <article key={r.id} className="border rounded-lg overflow-hidden bg-white">
             <div className="w-full h-48 bg-neutral-100 flex items-center justify-center overflow-hidden">
               {r.photo_path ? (
@@ -219,7 +226,8 @@ export default function Home() {
               )}
             </div>
           </article>
-        ))}
+        ))
+        )}
       </div>
     </section>
   )

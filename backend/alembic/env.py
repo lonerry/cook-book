@@ -2,10 +2,9 @@
 import os
 from logging.config import fileConfig
 
+from alembic import context
 from sqlalchemy import create_engine, pool
 from sqlalchemy.engine import Connection
-
-from alembic import context
 
 # 1) импортируем конфиг приложения и МОДЕЛИ до чтения metadata
 from backend.core.config import get_settings
@@ -22,7 +21,8 @@ settings = get_settings()
 def get_url() -> str:
     # Alembic запускаем на sync-драйвере
     url = os.getenv("DATABASE_URL", settings.database_url)
-    return url.replace("postgresql+asyncpg", "postgresql+psycopg2")
+    # Используем psycopg (psycopg3) sync‑драйвер
+    return url.replace("postgresql+asyncpg", "postgresql+psycopg")
 
 
 def run_migrations_offline() -> None:

@@ -122,15 +122,15 @@ async def create_from_request(
                 photo_file = candidate  # type: ignore[assignment]
                 break
 
-    photo_url: Optional[str] = None
+    # Read cover photo (if any) but upload only after recipe is created to use its id
+    photo_ext: Optional[str] = None
+    photo_bytes: Optional[bytes] = None
     if photo_file is not None:
         ext = os.path.splitext(photo_file.filename or "")[1].lower()
-        if ext not in {".jpg", ".jpeg", ".png"}:
+        if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
             raise http_error(ErrorCode.INVALID_IMAGE_TYPE)
-        safe_title = _slugify_ascii(title[:60], fallback="recipe")
-        key = f"recipes/{current_user.id}/recipe_{safe_title}{ext}"
-        data = await photo_file.read()
-        photo_url = upload_public_file(io.BytesIO(data), key)
+        photo_ext = ext
+        photo_bytes = await photo_file.read()
 
     recipe = await recipes_repo.create(
         db,
@@ -138,12 +138,18 @@ async def create_from_request(
         title=title,
         description=description,
         topic=topic,
-        photo_path=photo_url,
+        photo_path=None,
     )
     await recipes_repo.add_ingredients(
         db, recipe.id, [(i.name, i.quantity) for i in parsed_ing]
     )
     recipe = await recipes_repo.commit_refresh(db, recipe)
+
+    # Now that we have recipe.id, upload the cover photo with a unique key
+    if photo_bytes is not None and photo_ext is not None:
+        key = f"recipes/{current_user.id}/{recipe.id}/cover{photo_ext}"
+        recipe.photo_path = upload_public_file(io.BytesIO(photo_bytes), key)
+        recipe = await recipes_repo.commit_refresh(db, recipe)
 
     # steps
     step_items: List[dict] = []

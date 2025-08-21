@@ -53,7 +53,10 @@ async def verify(db: AsyncSession, *, payload: VerifyRequest) -> TokenResponse:
     if not user:
         raise http_error(ErrorCode.USER_NOT_FOUND)
 
+    # Ищем строго по user_id+code; если вдруг не нашли — пытаемся по email+code
     ver = await ver_repo.get_valid_code(db, user_id=user.id, code=payload.code)
+    if not ver:
+        ver = await ver_repo.get_valid_code_by_email(db, email=payload.email, code=payload.code)
     if not ver:
         raise http_error(ErrorCode.INVALID_CODE)
 
