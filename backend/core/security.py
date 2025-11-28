@@ -18,16 +18,11 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-def create_access_token(subject: str, expires_minutes: Optional[int] = None) -> str:
+def create_access_token(subject: str) -> str:
     settings = get_settings()
-    expire_minutes = (
-        expires_minutes
-        if expires_minutes is not None
-        else settings.access_token_expire_minutes
-    )
     to_encode = {
         "sub": subject,
-        "exp": datetime.now(timezone.utc) + timedelta(minutes=expire_minutes),
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=settings.access_token_expire_minutes),
         "iat": datetime.now(timezone.utc),
         "jti": str(uuid4()),
         "type": "access",

@@ -8,7 +8,7 @@ from backend.routers import users as users_router
 
 settings = get_settings()
 
-app = FastAPI(title=settings.app_name, debug=settings.debug)
+app = FastAPI(title=settings.app_name)
 
 app.add_middleware(
     CORSMiddleware,
