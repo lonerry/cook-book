@@ -21,8 +21,9 @@ settings = get_settings()
 def get_url() -> str:
     # Alembic запускаем на sync-драйвере
     url = os.getenv("DATABASE_URL", settings.database_url)
-    # Используем psycopg (psycopg3) sync‑драйвер
-    return url.replace("postgresql+asyncpg", "postgresql+psycopg")
+    # Используем psycopg2 sync‑драйвер (версия 2.9.10+ поддерживает Python 3.13)
+    url = url.replace("postgresql+asyncpg://", "postgresql+psycopg2://")
+    return url
 
 
 def run_migrations_offline() -> None:

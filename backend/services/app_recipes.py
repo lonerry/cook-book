@@ -10,9 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.errors import ErrorCode, http_error
 from backend.models import User
-from backend.models.recipe import TopicEnum
-from backend.repositories import comments as comments_repo
-from backend.repositories import recipes as recipes_repo
+from backend.models.comment import Comment
+from backend.models.recipe import Recipe, RecipeIngredient, TopicEnum
+from backend.repositories.comments import CommentRepository
+from backend.repositories.recipes import RecipeRepository
 from backend.schemas.recipe import (
     AuthorPublic,
     CommentPublic,
@@ -132,24 +133,28 @@ async def create_from_request(
         photo_ext = ext
         photo_bytes = await photo_file.read()
 
-    recipe = await recipes_repo.create(
-        db,
+    recipes_repo = RecipeRepository(db)
+    recipe = Recipe(
         author_id=current_user.id,
         title=title,
         description=description,
         topic=topic,
         photo_path=None,
     )
-    await recipes_repo.add_ingredients(
-        db, recipe.id, [(i.name, i.quantity) for i in parsed_ing]
-    )
-    recipe = await recipes_repo.commit_refresh(db, recipe)
+    recipe = await recipes_repo.create(recipe)
+
+    for i in parsed_ing:
+        db.add(RecipeIngredient(recipe_id=recipe.id, name=i.name, quantity=i.quantity))
+    await db.commit()
+    await db.refresh(recipe)
 
     # Now that we have recipe.id, upload the cover photo with a unique key
     if photo_bytes is not None and photo_ext is not None:
         key = f"recipes/{current_user.id}/{recipe.id}/cover{photo_ext}"
         recipe.photo_path = upload_public_file(io.BytesIO(photo_bytes), key)
-        recipe = await recipes_repo.commit_refresh(db, recipe)
+        db.add(recipe)
+        await db.commit()
+        await db.refresh(recipe)
 
     # steps
     step_items: List[dict] = []
@@ -187,8 +192,8 @@ async def create_from_request(
         uploaded_steps.append((idx + 1, text, url))
 
     if uploaded_steps:
-        await recipes_repo.set_steps(db, recipe.id, uploaded_steps)
-        recipe = await recipes_repo.commit_refresh(db, recipe)
+        await recipes_repo.set_steps(recipe.id, uploaded_steps)
+        recipe = await recipes_repo.get(recipe.id)  # refresh
 
     return map_recipe_to_public(recipe, likes_count=0)
 
@@ -203,18 +208,19 @@ async def list_public(
     offset: int,
     q: Optional[str] = None,
 ) -> List[RecipePublic]:
+    recipes_repo = RecipeRepository(db)
     recipes = await recipes_repo.list_recipes(
-        db, topic=topic, limit=limit, offset=offset, order=(order or "desc"), q=q
+        topic=topic, limit=limit, offset=offset, order=(order or "desc"), q=q
     )
     result: List[RecipePublic] = []
     for r in recipes:
         liked = await recipes_repo.liked_by_user(
-            db, recipe_id=r.id, user_id=(current_user.id if current_user else None)
+            recipe_id=r.id, user_id=(current_user.id if current_user else None)
         )
         result.append(
             map_recipe_to_public(
                 r,
-                likes_count=await recipes_repo.likes_count(db, r.id),
+                likes_count=await recipes_repo.likes_count(r.id),
                 include_author=True,
                 liked_by_me=liked,
             )
@@ -229,16 +235,17 @@ async def popular_public(
     limit: int,
     offset: int,
 ) -> List[RecipePublic]:
-    recipes = await recipes_repo.popular(db, limit=limit, offset=offset)
+    recipes_repo = RecipeRepository(db)
+    recipes = await recipes_repo.popular(limit=limit, offset=offset)
     result: List[RecipePublic] = []
     for r in recipes:
         liked = await recipes_repo.liked_by_user(
-            db, recipe_id=r.id, user_id=(current_user.id if current_user else None)
+            recipe_id=r.id, user_id=(current_user.id if current_user else None)
         )
         result.append(
             map_recipe_to_public(
                 r,
-                likes_count=await recipes_repo.likes_count(db, r.id),
+                likes_count=await recipes_repo.likes_count(r.id),
                 include_author=True,
                 liked_by_me=liked,
             )
@@ -252,13 +259,14 @@ async def get_public(
     current_user: Optional[User],
     recipe_id: int,
 ) -> RecipePublic:
-    recipe = await recipes_repo.get(db, recipe_id)
+    recipes_repo = RecipeRepository(db)
+    recipe = await recipes_repo.get(recipe_id)
     if not recipe:
         raise http_error(ErrorCode.RECIPE_NOT_FOUND)
     liked = await recipes_repo.liked_by_user(
-        db, recipe_id=recipe.id, user_id=(current_user.id if current_user else None)
+        recipe_id=recipe.id, user_id=(current_user.id if current_user else None)
     )
-    likes = await recipes_repo.likes_count(db, recipe.id)
+    likes = await recipes_repo.likes_count(recipe.id)
     return map_recipe_to_public(
         recipe,
         likes_count=likes,
@@ -271,19 +279,21 @@ async def get_public(
 async def toggle_like(
     db: AsyncSession, *, current_user: User, recipe_id: int
 ) -> tuple[bool, int]:
-    recipe = await recipes_repo.get(db, recipe_id)
+    recipes_repo = RecipeRepository(db)
+    recipe = await recipes_repo.get(recipe_id)
     if not recipe:
         raise http_error(ErrorCode.RECIPE_NOT_FOUND)
     return await recipes_repo.toggle_like(
-        db, user_id=current_user.id, recipe_id=recipe_id
+        user_id=current_user.id, recipe_id=recipe_id
     )
 
 
 async def delete_by_author(
     db: AsyncSession, *, current_user: User, recipe_id: int
 ) -> None:
+    recipes_repo = RecipeRepository(db)
     ok = await recipes_repo.delete_by_author(
-        db, recipe_id=recipe_id, author_id=current_user.id
+        recipe_id=recipe_id, author_id=current_user.id
     )
     if not ok:
         raise http_error(ErrorCode.RECIPE_NOT_FOUND)
@@ -301,7 +311,8 @@ async def update_from_request(
     ingredients: Optional[str],
     steps: Optional[str],
 ) -> RecipePublic:
-    recipe = await recipes_repo.get(db, recipe_id)
+    recipes_repo = RecipeRepository(db)
+    recipe = await recipes_repo.get(recipe_id)
     if not recipe:
         raise http_error(ErrorCode.RECIPE_NOT_FOUND)
     if recipe.author_id != current_user.id:
@@ -342,7 +353,7 @@ async def update_from_request(
             parsed = [(str(i["name"]), str(i["quantity"])) for i in items]
         except Exception:
             raise http_error(ErrorCode.INVALID_INGREDIENTS_JSON)
-        await recipes_repo.replace_ingredients(db, recipe.id, parsed)
+        await recipes_repo.replace_ingredients(recipe.id, parsed)
 
     # Update steps if provided
     if steps is not None:
@@ -378,10 +389,11 @@ async def update_from_request(
                 data = await f.read()
                 url = upload_public_file(io.BytesIO(data), key)
             uploaded_steps.append((idx + 1, text, url))
-        await recipes_repo.set_steps(db, recipe.id, uploaded_steps)
+        await recipes_repo.set_steps(recipe.id, uploaded_steps)
 
-    recipe = await recipes_repo.commit_refresh(db, recipe)
-    likes = await recipes_repo.likes_count(db, recipe.id)
+    await db.commit()
+    await db.refresh(recipe)
+    likes = await recipes_repo.likes_count(recipe.id)
     return map_recipe_to_public(recipe, likes_count=likes, include_author=True)
 
 
@@ -393,10 +405,13 @@ async def list_comments_public(
     limit: int,
     offset: int,
 ) -> list[CommentPublic]:
+    recipes_repo = RecipeRepository(db)
+    comments_repo = CommentRepository(db)
+
     rows = await comments_repo.list_for_recipe(
-        db, recipe_id=recipe_id, limit=limit, offset=offset
+        recipe_id=recipe_id, limit=limit, offset=offset
     )
-    recipe = await recipes_repo.get(db, recipe_id)
+    recipe = await recipes_repo.get(recipe_id)
     return [
         CommentPublic(
             id=c.id,
@@ -428,12 +443,16 @@ async def add_comment(
     current_user: User,
     content: str,
 ) -> CommentPublic:
-    recipe = await recipes_repo.get(db, recipe_id)
+    recipes_repo = RecipeRepository(db)
+    comments_repo = CommentRepository(db)
+
+    recipe = await recipes_repo.get(recipe_id)
     if not recipe:
         raise http_error(ErrorCode.RECIPE_NOT_FOUND)
-    comment = await comments_repo.create(
-        db, recipe_id=recipe_id, author_id=current_user.id, content=content
+    comment = Comment(
+        recipe_id=recipe_id, author_id=current_user.id, content=content
     )
+    comment = await comments_repo.create(comment)
     return CommentPublic(
         id=comment.id,
         author=AuthorPublic(
@@ -457,15 +476,18 @@ async def edit_comment(
     current_user: User,
     content: str,
 ) -> CommentPublic:
-    recipe = await recipes_repo.get(db, recipe_id)
+    recipes_repo = RecipeRepository(db)
+    comments_repo = CommentRepository(db)
+
+    recipe = await recipes_repo.get(recipe_id)
     if not recipe:
         raise http_error(ErrorCode.RECIPE_NOT_FOUND)
-    comment = await comments_repo.get(db, comment_id=comment_id)
+    comment = await comments_repo.get(comment_id)
     if not comment or comment.recipe_id != recipe_id:
         raise http_error(ErrorCode.COMMENT_NOT_FOUND)
     if comment.author_id != current_user.id:
         raise http_error(ErrorCode.FORBIDDEN)
-    comment = await comments_repo.update_content(db, comment=comment, content=content)
+    comment = await comments_repo.update(comment, {"content": content})
     return CommentPublic(
         id=comment.id,
         author=AuthorPublic(
@@ -488,13 +510,16 @@ async def delete_comment(
     comment_id: int,
     current_user: User,
 ) -> dict:
-    recipe = await recipes_repo.get(db, recipe_id)
+    recipes_repo = RecipeRepository(db)
+    comments_repo = CommentRepository(db)
+
+    recipe = await recipes_repo.get(recipe_id)
     if not recipe:
         raise http_error(ErrorCode.RECIPE_NOT_FOUND)
-    comment = await comments_repo.get(db, comment_id=comment_id)
+    comment = await comments_repo.get(comment_id)
     if not comment or comment.recipe_id != recipe_id:
         raise http_error(ErrorCode.COMMENT_NOT_FOUND)
     if comment.author_id != current_user.id and recipe.author_id != current_user.id:
         raise http_error(ErrorCode.FORBIDDEN)
-    await comments_repo.delete(db, comment=comment)
+    await comments_repo.delete(comment)
     return {"deleted": True}

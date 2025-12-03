@@ -15,8 +15,9 @@ from backend.core.security import (
     verify_password,
 )
 from backend.core.token_blacklist import add_to_blacklist, is_blacklisted
-from backend.repositories import users as users_repo
-from backend.repositories import verification as ver_repo
+from backend.models import User
+from backend.repositories.users import UserRepository
+from backend.repositories.verification import EmailVerificationRepository
 from backend.schemas.auth import (
     LoginRequest,
     RegisterRequest,
@@ -29,46 +30,55 @@ from backend.services.email import publish_reset_email, publish_verification_ema
 
 
 async def register(db: AsyncSession, *, payload: RegisterRequest) -> MessageResponse:
-    existing = await users_repo.get_by_email(db, payload.email)
+    users_repo = UserRepository(db)
+    ver_repo = EmailVerificationRepository(db)
+
+    existing = await users_repo.get_by_email(payload.email)
     if existing:
         raise http_error(ErrorCode.EMAIL_EXISTS)
 
-    user = await users_repo.create(
-        db, email=payload.email, hashed_password=get_password_hash(payload.password)
+    user = User(
+        email=payload.email,
+        hashed_password=get_password_hash(payload.password),
+        is_active=False,
     )
+    user = await users_repo.create(user)
 
     code = f"{random.randint(0, 999999):06d}"
-    await ver_repo.create_code(db, user_id=user.id, code=code)
+    await ver_repo.create_code(user_id=user.id, code=code)
 
     try:
         publish_verification_email(user.email, code)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-    return MessageResponse(message="Registered. Check your email for the verification code.")  # type: ignore[return-value]
+    return MessageResponse(message="Registered. Check your email for the verification code.") 
 
 
 async def verify(db: AsyncSession, *, payload: VerifyRequest) -> TokenResponse:
-    user = await users_repo.get_by_email(db, payload.email)
+    users_repo = UserRepository(db)
+    ver_repo = EmailVerificationRepository(db)
+
+    user = await users_repo.get_by_email(payload.email)
     if not user:
         raise http_error(ErrorCode.USER_NOT_FOUND)
 
-    # Ищем строго по user_id+code; если вдруг не нашли — пытаемся по email+code
-    ver = await ver_repo.get_valid_code(db, user_id=user.id, code=payload.code)
+    ver = await ver_repo.get_valid_code(user_id=user.id, code=payload.code)
     if not ver:
         ver = await ver_repo.get_valid_code_by_email(db, email=payload.email, code=payload.code)
     if not ver:
         raise http_error(ErrorCode.INVALID_CODE)
 
-    await ver_repo.consume(db, ver)
-    user = await users_repo.activate(db, user)
+    await ver_repo.consume(ver)
+    user = await users_repo.update(user, {"is_active": True})
 
     token = create_access_token(str(user.id))
     return TokenResponse(access_token=token)
 
 
 async def login_json(db: AsyncSession, *, payload: LoginRequest) -> TokenResponse:
-    user = await users_repo.get_by_email(db, payload.email)
+    users_repo = UserRepository(db)
+    user = await users_repo.get_by_email(payload.email)
     if not user or not verify_password(payload.password, user.hashed_password):
         raise http_error(ErrorCode.INCORRECT_CREDENTIALS)
     if not user.is_active:
@@ -90,7 +100,8 @@ async def logout(*, token: str | None) -> MessageResponse:
 
 
 async def forgot_password(db: AsyncSession, *, email: str) -> MessageResponse:
-    user = await users_repo.get_by_email(db, email)
+    users_repo = UserRepository(db)
+    user = await users_repo.get_by_email(email)
     if user and user.is_active:
         token = create_reset_token(str(user.id))
         s = get_settings()
@@ -125,7 +136,7 @@ async def reset_password(
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token"
             )
-        user_id = int(data["sub"])  # type: ignore[index]
+        user_id = int(data["sub"]) 
     except JWTError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token"
@@ -136,13 +147,12 @@ async def reset_password(
             status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid token"
         )
 
-    user = await users_repo.get_by_id(db, user_id)
+    users_repo = UserRepository(db)
+    user = await users_repo.get(user_id)
     if not user:
         raise http_error(ErrorCode.USER_NOT_FOUND)
 
-    await users_repo.update_password(
-        db, user=user, hashed_password=get_password_hash(payload.new_password)
-    )
+    await users_repo.update(user, {"hashed_password": get_password_hash(payload.new_password)})
 
     await add_to_blacklist(data.get("jti"))
 

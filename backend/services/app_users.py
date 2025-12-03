@@ -11,20 +11,21 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.core.errors import ErrorCode, http_error
 from backend.core.security import get_password_hash, verify_password
 from backend.models import User
-from backend.repositories import recipes as recipes_repo
-from backend.repositories import users as users_repo
+from backend.repositories.recipes import RecipeRepository
+from backend.repositories.users import UserRepository
 from backend.schemas.common import PhotoResponse
 from backend.schemas.user import ChangePasswordRequest
 from backend.services.storage import delete_file_by_url, upload_public_file
 
 
 async def get_me(db: AsyncSession, *, current_user: User) -> dict:
-    recipes_rows = await recipes_repo.list_by_author(db, author_id=current_user.id)
+    recipes_repo = RecipeRepository(db)
+    recipes_rows = await recipes_repo.list_by_author(author_id=current_user.id)
     recipes: list[dict] = []
     for r in recipes_rows:
-        likes = await recipes_repo.likes_count(db, r.id)
+        likes = await recipes_repo.likes_count(r.id)
         liked_by_me = await recipes_repo.liked_by_user(
-            db, recipe_id=r.id, user_id=current_user.id
+            recipe_id=r.id, user_id=current_user.id
         )
         recipes.append(
             {
@@ -54,15 +55,18 @@ async def get_me(db: AsyncSession, *, current_user: User) -> dict:
 async def get_public_profile(
     db: AsyncSession, *, user_id: int, viewer: Optional[User]
 ) -> dict:
-    user = await users_repo.get_by_id(db, user_id)
+    users_repo = UserRepository(db)
+    recipes_repo = RecipeRepository(db)
+
+    user = await users_repo.get(user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    recipes_rows = await recipes_repo.list_by_author(db, author_id=user.id)
+    recipes_rows = await recipes_repo.list_by_author(author_id=user.id)
     recipes: list[dict] = []
     for r in recipes_rows:
-        likes = await recipes_repo.likes_count(db, r.id)
+        likes = await recipes_repo.likes_count(r.id)
         liked_by_me = await recipes_repo.liked_by_user(
-            db, recipe_id=r.id, user_id=(viewer.id if viewer else None)
+            recipe_id=r.id, user_id=(viewer.id if viewer else None)
         )
         recipes.append(
             {
@@ -107,13 +111,13 @@ async def update_me_form(
         data = await photo.read()
         photo_url = upload_public_file(io.BytesIO(data), key)
 
-    user = await users_repo.update_profile(
-        db,
-        current_user,
-        nickname=nickname,
-        full_name=full_name,
-        photo_path=photo_url,
-    )
+    users_repo = UserRepository(db)
+    data: dict = {
+        "nickname": nickname,
+        "full_name": full_name,
+        "photo_path": photo_url,
+    }
+    user = await users_repo.update(current_user, {k: v for k, v in data.items() if v is not None})
     return user
 
 
@@ -124,9 +128,9 @@ async def update_me_json(
     nickname: Optional[str],
     full_name: Optional[str],
 ):
-    return await users_repo.update_profile(
-        db, current_user, nickname=nickname, full_name=full_name
-    )
+    users_repo = UserRepository(db)
+    data: dict = {"nickname": nickname, "full_name": full_name}
+    return await users_repo.update(current_user, {k: v for k, v in data.items() if v is not None})
 
 
 async def upload_avatar(
@@ -147,7 +151,8 @@ async def upload_avatar(
     key = f"avatars/{current_user.id}/avatar_{ts}{ext}"
     data = await file.read()
     url = upload_public_file(io.BytesIO(data), key)
-    user = await users_repo.update_profile(db, current_user, photo_path=url)
+    users_repo = UserRepository(db)
+    user = await users_repo.update(current_user, {"photo_path": url})
     return PhotoResponse(photo_path=user.photo_path)
 
 
@@ -158,7 +163,8 @@ async def delete_avatar(db: AsyncSession, *, current_user: User) -> dict:
         delete_file_by_url(current_user.photo_path)
     except Exception:
         pass
-    await users_repo.update_profile(db, current_user, photo_path=None)
+    users_repo = UserRepository(db)
+    await users_repo.update(current_user, {"photo_path": None})
     return {"deleted": True}
 
 
@@ -171,4 +177,5 @@ async def change_password(
     if not verify_password(payload.old_password, current_user.hashed_password):
         raise http_error(ErrorCode.INCORRECT_CREDENTIALS)
     hashed = get_password_hash(payload.new_password)
-    await users_repo.update_password(db, user=current_user, hashed_password=hashed)
+    users_repo = UserRepository(db)
+    await users_repo.update(current_user, {"hashed_password": hashed})

@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.db.session import get_db
 from backend.models import User
-from backend.repositories import users as users_repo
+from backend.repositories.users import UserRepository
 from backend.services import app_auth as auth_svc
 
 bearer_scheme = HTTPBearer(auto_error=False)
@@ -22,7 +22,8 @@ async def get_current_user(
         )
     token = credentials.credentials
     user_id = await auth_svc.validate_access_token(token)
-    user = await users_repo.get_by_id(db, int(user_id))
+    users_repo = UserRepository(db)
+    user = await users_repo.get(int(user_id))
     if user is None or not user.is_active:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Inactive or missing user"
@@ -40,7 +41,8 @@ async def get_current_user_optional(
     user_id = await auth_svc.try_get_user_id_from_token(token)
     if user_id is None:
         return None
-    user = await users_repo.get_by_id(db, int(user_id))
+    users_repo = UserRepository(db)
+    user = await users_repo.get(int(user_id))
     if user is None or not user.is_active:
         return None
     return user
