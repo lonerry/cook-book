@@ -21,7 +21,7 @@ from backend.schemas.recipe import (
     RecipePublic,
     RecipeStepItem,
 )
-from backend.services.storage import upload_public_file
+from backend.services.storage import upload_public_file, get_public_url_or_presigned
 
 
 def _slugify_ascii(text: str, fallback: str = "file") -> str:
@@ -53,10 +53,14 @@ def map_recipe_to_public(
             id=recipe.author.id,
             email=recipe.author.email,
             nickname=recipe.author.nickname,
-            photo_path=recipe.author.photo_path,
+            photo_path=get_public_url_or_presigned(recipe.author.photo_path) if recipe.author.photo_path else None,
         )
     steps = [
-        RecipeStepItem(order_index=s.order_index, text=s.text, photo_path=s.photo_path)
+        RecipeStepItem(
+            order_index=s.order_index, 
+            text=s.text, 
+            photo_path=get_public_url_or_presigned(s.photo_path) if s.photo_path else None
+        )
         for s in getattr(recipe, "steps", [])
     ]
     comments = None
@@ -68,7 +72,7 @@ def map_recipe_to_public(
                     id=c.author.id,
                     email=c.author.email,
                     nickname=c.author.nickname,
-                    photo_path=c.author.photo_path,
+                    photo_path=get_public_url_or_presigned(c.author.photo_path) if c.author.photo_path else None,
                 ),
                 content=c.content,
                 created_at=c.created_at,
@@ -83,7 +87,7 @@ def map_recipe_to_public(
         title=recipe.title,
         description=recipe.description,
         topic=recipe.topic,
-        photo_path=recipe.photo_path,
+        photo_path=get_public_url_or_presigned(recipe.photo_path) if recipe.photo_path else None,
         created_at=recipe.created_at,
         likes_count=likes_count,
         liked_by_me=liked_by_me,
@@ -364,6 +368,9 @@ async def update_from_request(
         except Exception:
             step_items = []
 
+        # Load existing steps to preserve photos that aren't being replaced
+        existing_steps = {s.order_index: s.photo_path for s in recipe.steps}
+
         files: list[UploadFile] = []
         for key in ("step_photos", "step_photos[]"):
             if key in form:
@@ -379,16 +386,25 @@ async def update_from_request(
             if not text:
                 continue
             url: str | None = None
+            order_index = idx + 1
+            
+            # Check if a new file is being uploaded for this step
             if bool(item.get("with_file")) and file_cursor < len(files):
+                # New file uploaded - use it
                 f = files[file_cursor]
                 file_cursor += 1
                 ext = os.path.splitext(f.filename or "")[1].lower()
                 if ext not in {".jpg", ".jpeg", ".png", ".webp"}:
                     raise http_error(ErrorCode.INVALID_IMAGE_TYPE)
-                key = f"recipes/{current_user.id}/{recipe.id}/steps/step_{idx+1}{ext}"
+                key = f"recipes/{current_user.id}/{recipe.id}/steps/step_{order_index}{ext}"
                 data = await f.read()
                 url = upload_public_file(io.BytesIO(data), key)
-            uploaded_steps.append((idx + 1, text, url))
+            elif order_index in existing_steps:
+                # No new file, but step had a photo - preserve it
+                url = existing_steps[order_index]
+            # If with_file is False or not set and no existing photo, url remains None
+            
+            uploaded_steps.append((order_index, text, url))
         await recipes_repo.set_steps(recipe.id, uploaded_steps)
 
     await db.commit()
@@ -419,7 +435,7 @@ async def list_comments_public(
                 id=c.author.id,
                 email=c.author.email,
                 nickname=c.author.nickname,
-                photo_path=c.author.photo_path,
+                photo_path=get_public_url_or_presigned(c.author.photo_path) if c.author.photo_path else None,
             ),
             content=c.content,
             created_at=c.created_at,
@@ -459,7 +475,7 @@ async def add_comment(
             id=current_user.id,
             email=current_user.email,
             nickname=current_user.nickname,
-            photo_path=current_user.photo_path,
+            photo_path=get_public_url_or_presigned(current_user.photo_path) if current_user.photo_path else None,
         ),
         content=comment.content,
         created_at=comment.created_at,
@@ -494,7 +510,7 @@ async def edit_comment(
             id=current_user.id,
             email=current_user.email,
             nickname=current_user.nickname,
-            photo_path=current_user.photo_path,
+            photo_path=get_public_url_or_presigned(current_user.photo_path) if current_user.photo_path else None,
         ),
         content=comment.content,
         created_at=comment.created_at,

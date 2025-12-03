@@ -158,8 +158,6 @@ export default function Home() {
               <a
                 className="font-semibold cursor-pointer hover:underline"
                 href={`/recipes/${r.id}`}
-                target="_blank"
-                rel="noreferrer"
               >
                 {r.title}
               </a>

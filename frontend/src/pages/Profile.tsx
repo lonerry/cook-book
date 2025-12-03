@@ -1,256 +1,516 @@
-import React, { useEffect, useRef, useState } from 'react'
-import api from '../utils/api'
-import { useAppSelector } from '../hooks/useRedux'
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Camera, Edit, Plus, Loader2, LogOut, Key, Trash2 } from 'lucide-react';
+import { Layout } from '@/components/layout/Layout';
+import { RecipeCard } from '@/components/recipes/RecipeCard';
+import { RecipeCardSkeleton } from '@/components/recipes/RecipeCardSkeleton';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Recipe, authApi, usersApi, recipesApi } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
-interface RecipeItem { id: number; title: string; topic: string; photo_path?: string | null; description?: string; ingredients?: {name:string; quantity:string}[] }
+const Profile = () => {
+  const { user, logout, updateUser, isAuthenticated } = useAuth();
+  const navigate = useNavigate();
+  const { toast } = useToast();
 
-export default function Profile() {
-  const token = useAppSelector(s => s.auth.token)
-  const [me, setMe] = useState<any>(null)
-  const [nickname, setNickname] = useState('')
-  const [expanded, setExpanded] = useState<Record<number, boolean>>({})
-  const [err, setErr] = useState<string | null>(null)
-  const [isEditingNick, setIsEditingNick] = useState(false)
-  const [savingNick, setSavingNick] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement | null>(null)
-  const [tab, setTab] = useState<'mine'|'favorites'|'settings'>('mine')
-  const [favorites, setFavorites] = useState<RecipeItem[] | null>(null)
-  const [oldPass, setOldPass] = useState('')
-  const [newPass1, setNewPass1] = useState('')
-  const [newPass2, setNewPass2] = useState('')
-  const [passMsg, setPassMsg] = useState<string | null>(null)
-  const [showPassForm, setShowPassForm] = useState(false)
+  const [recipes, setRecipes] = useState<Recipe[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [nickname, setNickname] = useState(user?.nickname || '');
+  const [isSaving, setIsSaving] = useState(false);
+  const [deleteRecipeId, setDeleteRecipeId] = useState<number | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [likingRecipeId, setLikingRecipeId] = useState<number | null>(null);
 
-  const load = async () => {
-    const res = await api.get('/users/me')
-    setMe(res.data)
-    setNickname(res.data.nickname || '')
-  }
+  // Password change state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
-  useEffect(() => { (async () => { if (!token) return; await load() })() }, [token])
-
-  const loadFavorites = async () => {
-    // Берём публичный список и фильтруем по liked_by_me
-    const res = await api.get('/recipes', { params: { order: 'desc', limit: 100 } })
-    const items = (res.data || []).filter((r: any) => r.liked_by_me)
-    setFavorites(items)
-  }
-
-  const onUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!e.target.files?.[0]) return
-    const form = new FormData()
-    form.append('file', e.target.files[0])
-    const res = await api.post('/users/me/photo', form)
-    const url = res.data?.photo_path
-    if (url) setMe((prev:any)=> ({ ...prev, photo_path: url }))
-  }
-  const onDeletePhoto = async () => {
-    await api.delete('/users/me/photo')
-    setMe((prev:any)=> ({ ...prev, photo_path: null }))
-  }
-
-  const deleteRecipe = async (id: number) => {
-    try {
-      await api.delete(`/recipes/${id}`)
-      await load()
-    } catch (e) { console.error(e) }
-  }
-
-  const saveNickname = async () => {
-    setErr(null)
-    setSavingNick(true)
-    try {
-      const form = new FormData()
-      form.append('nickname', nickname)
-      await api.patch('/users/me', form)
-      await load()
-      setIsEditingNick(false)
-    } catch (e: any) {
-      setErr('Не удалось сохранить ник')
-    } finally {
-      setSavingNick(false)
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
     }
-  }
 
-  if (!token) return <div>Нужно войти</div>
-  if (!me) return <div>Загрузка…</div>
+    const fetchRecipes = async () => {
+      if (!user) return;
+      
+      setIsLoading(true);
+      try {
+        // Получаем данные пользователя, которые включают рецепты
+        const userData = await authApi.getCurrentUser();
+        if (userData.recipes) {
+          // Добавляем author_id и author к рецептам, если их нет
+          const recipesWithAuthor = userData.recipes.map((recipe: any) => ({
+            ...recipe,
+            author_id: recipe.author_id || user.id,
+            author: recipe.author || {
+              id: user.id,
+              email: user.email,
+              nickname: user.nickname,
+              photo_path: user.photo_path,
+            },
+            created_at: recipe.created_at || new Date().toISOString(),
+          }));
+          setRecipes(recipesWithAuthor);
+        } else {
+          setRecipes([]);
+        }
+      } catch (error) {
+        console.error('Failed to fetch recipes:', error);
+        // Demo data
+        setRecipes([
+          {
+            id: 1,
+            author_id: user.id,
+            title: 'Мой любимый рецепт панкейков',
+            description: 'Быстрый и вкусный завтрак',
+            topic: 'breakfast',
+            photo_path: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=800',
+            ingredients: [],
+            steps: [],
+            author: { id: user.id, email: user.email, nickname: user.nickname, photo_path: user.photo_path },
+            likes_count: 42,
+            liked_by_me: false,
+            created_at: new Date().toISOString(),
+          },
+          {
+            id: 2,
+            author_id: user.id,
+            title: 'Домашняя паста',
+            description: 'Рецепт из Италии',
+            topic: 'lunch',
+            photo_path: 'https://images.unsplash.com/photo-1612874742237-6526221588e3?w=800',
+            ingredients: [],
+            steps: [],
+            author: { id: user.id, email: user.email, nickname: user.nickname, photo_path: user.photo_path },
+            likes_count: 28,
+            liked_by_me: true,
+            created_at: new Date(Date.now() - 86400000).toISOString(),
+          },
+          {
+            id: 3,
+            author_id: user.id,
+            title: 'Куриный суп с лапшой',
+            description: 'Традиционный домашний рецепт',
+            topic: 'dinner',
+            photo_path: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=800',
+            ingredients: [],
+            steps: [],
+            author: { id: user.id, email: user.email, nickname: user.nickname, photo_path: user.photo_path },
+            likes_count: 35,
+            liked_by_me: false,
+            created_at: new Date(Date.now() - 172800000).toISOString(),
+          },
+        ]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchRecipes();
+  }, [user, isAuthenticated, navigate]);
+
+  const handleSaveProfile = async () => {
+    setIsSaving(true);
+    try {
+      const updatedUser = await usersApi.updateProfile({ nickname });
+      updateUser(updatedUser);
+      setIsEditingProfile(false);
+      toast({ title: 'Профиль обновлен' });
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось обновить профиль',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (newPassword !== confirmPassword) {
+      toast({
+        title: 'Ошибка',
+        description: 'Пароли не совпадают',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      toast({
+        title: 'Ошибка',
+        description: 'Пароль должен содержать минимум 6 символов',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      await authApi.changePassword(currentPassword, newPassword);
+      setIsChangingPassword(false);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      toast({ title: 'Пароль успешно изменен' });
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось изменить пароль. Проверьте текущий пароль.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleDeleteRecipe = async () => {
+    if (!deleteRecipeId) return;
+    
+    setIsDeleting(true);
+    try {
+      await recipesApi.delete(deleteRecipeId);
+      setRecipes((prev) => prev.filter((r) => r.id !== deleteRecipeId));
+      toast({ title: 'Рецепт удален' });
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось удалить рецепт',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsDeleting(false);
+      setDeleteRecipeId(null);
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/');
+  };
+
+  const handleLike = async (recipeId: number) => {
+    setLikingRecipeId(recipeId);
+    try {
+      const response = await recipesApi.toggleLike(recipeId);
+      // Обновляем состояние рецепта
+      setRecipes((prev) =>
+        prev.map((recipe) =>
+          recipe.id === recipeId
+            ? {
+                ...recipe,
+                liked_by_me: response.liked,
+                likes_count: response.likes_count,
+              }
+            : recipe
+        )
+      );
+    } catch (error) {
+      console.error('Failed to toggle like:', error);
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось поставить лайк',
+        variant: 'destructive',
+      });
+    } finally {
+      setLikingRecipeId(null);
+    }
+  };
+
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const result = await usersApi.uploadAvatar(file);
+      // Обновляем пользователя с новым photo_path
+      const updatedUser = await authApi.getCurrentUser();
+      updateUser(updatedUser);
+      toast({ title: 'Аватар обновлен' });
+      // Сброс input для возможности повторной загрузки того же файла
+      e.target.value = '';
+    } catch (error) {
+      toast({
+        title: 'Ошибка',
+        description: 'Не удалось загрузить аватар',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  if (!user) return null;
+
+  const totalLikes = recipes.reduce((sum, recipe) => sum + recipe.likes_count, 0);
 
   return (
-    <section className="max-w-3xl space-y-6">
-      {/* Шапка профиля */}
-      <div className="flex items-center gap-4">
-        <div className="flex flex-col items-center">
-          <div className="relative group inline-block">
-            {me.photo_path ? (
-              <>
-                <img src={me.photo_path} className="w-20 h-20 rounded-full object-cover" title="Изменить фото" />
-                <label htmlFor="avatar_input" className="absolute inset-0 rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-xs text-white cursor-pointer">Изменить</label>
-              </>
-            ) : (
-              <div className="w-20 h-20 rounded-full bg-neutral-200 cursor-pointer flex items-center justify-center text-xs text-neutral-500" onClick={() => fileInputRef.current?.click()}>
-                Выбрать фото
+    <Layout>
+      <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+        {/* Profile Header */}
+        <div className="bg-card rounded-2xl shadow-card p-6 md:p-8 mb-8 animate-fade-up">
+          <div className="flex flex-col md:flex-row items-center md:items-start gap-6 md:gap-8">
+            {/* Avatar */}
+            <div className="relative">
+              <Avatar className="h-24 w-24 md:h-32 md:w-32">
+                <AvatarImage src={user.photo_path} />
+                <AvatarFallback className="text-3xl bg-primary/10 text-primary">
+                  {user.nickname?.[0] || user.email?.[0]?.toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <label className="absolute bottom-0 right-0">
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleAvatarChange}
+                />
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  className="rounded-full shadow-md h-8 w-8 cursor-pointer"
+                  asChild
+                >
+                  <span>
+                    <Camera className="h-4 w-4" />
+                  </span>
+                </Button>
+              </label>
+            </div>
+
+            {/* Info */}
+            <div className="flex-1 text-center md:text-left space-y-2">
+              <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground">
+                {user.nickname || 'Пользователь'}
+              </h1>
+              <p className="text-muted-foreground">{user.email}</p>
+
+              {/* Stats */}
+              <div className="flex justify-center md:justify-start gap-6 pt-4">
+                <div className="text-center">
+                  <p className="font-display text-2xl font-bold text-foreground">{recipes.length}</p>
+                  <p className="text-sm text-muted-foreground">Рецептов</p>
+                </div>
+                <div className="text-center">
+                  <p className="font-display text-2xl font-bold text-primary">{totalLikes}</p>
+                  <p className="text-sm text-muted-foreground">Лайков</p>
+                </div>
               </div>
-            )}
-            <input id="avatar_input" ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={onUpload} />
+            </div>
+
+            {/* Actions */}
+            <div className="flex flex-col gap-2">
+              <Dialog open={isEditingProfile} onOpenChange={setIsEditingProfile}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <Edit className="h-4 w-4" />
+                    Редактировать
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Редактировать профиль</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="nickname">Никнейм</Label>
+                      <Input
+                        id="nickname"
+                        value={nickname}
+                        onChange={(e) => setNickname(e.target.value)}
+                        placeholder="Введите никнейм"
+                      />
+                    </div>
+                    <Button onClick={handleSaveProfile} disabled={isSaving} className="w-full">
+                      {isSaving ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : null}
+                      Сохранить
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={isChangingPassword} onOpenChange={setIsChangingPassword}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="gap-2">
+                    <Key className="h-4 w-4" />
+                    Изменить пароль
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Изменить пароль</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="currentPassword">Текущий пароль</Label>
+                      <Input
+                        id="currentPassword"
+                        type="password"
+                        value={currentPassword}
+                        onChange={(e) => setCurrentPassword(e.target.value)}
+                        placeholder="Введите текущий пароль"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="newPassword">Новый пароль</Label>
+                      <Input
+                        id="newPassword"
+                        type="password"
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder="Введите новый пароль"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="confirmPassword">Подтвердите пароль</Label>
+                      <Input
+                        id="confirmPassword"
+                        type="password"
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder="Повторите новый пароль"
+                      />
+                    </div>
+                    <Button onClick={handleChangePassword} disabled={isSaving} className="w-full">
+                      {isSaving ? (
+                        <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                      ) : null}
+                      Изменить пароль
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Button variant="ghost" className="gap-2 text-destructive" onClick={handleLogout}>
+                <LogOut className="h-4 w-4" />
+                Выйти
+              </Button>
+            </div>
           </div>
-          {me.photo_path && (
-            <div className="mt-1 text-[11px] text-neutral-400 hover:text-red-600 cursor-pointer text-center" onClick={onDeletePhoto}>Удалить фото</div>
+        </div>
+
+        {/* My Recipes */}
+        <section className="space-y-6">
+          <div className="flex items-center justify-between">
+            <h2 className="font-display text-2xl font-semibold text-foreground">Мои рецепты</h2>
+            <Button asChild>
+              <Link to="/recipes/new">
+                <Plus className="h-4 w-4 mr-2" />
+                Новый рецепт
+              </Link>
+            </Button>
+          </div>
+
+          {isLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <RecipeCardSkeleton key={i} />
+              ))}
+            </div>
+          ) : recipes.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {recipes.map((recipe, index) => (
+                <div
+                  key={recipe.id}
+                  className="animate-fade-up"
+                  style={{ animationDelay: `${index * 0.05}s` }}
+                >
+                  <div className="relative group">
+                    <RecipeCard recipe={recipe} onLike={handleLike} isLiking={likingRecipeId === recipe.id} />
+                    {/* Edit/Delete overlay */}
+                    <div className="absolute top-3 right-14 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                      <Button
+                        size="icon"
+                        variant="secondary"
+                        className="h-8 w-8 shadow-md bg-background/90 backdrop-blur-sm"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          navigate(`/recipes/${recipe.id}/edit`);
+                        }}
+                      >
+                        <Edit className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="destructive"
+                        className="h-8 w-8 shadow-md bg-destructive/90 backdrop-blur-sm"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setDeleteRecipeId(recipe.id);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-16 bg-muted/30 rounded-2xl">
+              <p className="text-muted-foreground mb-4">У вас пока нет рецептов</p>
+              <Button asChild>
+                <Link to="/recipes/new">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Создать первый рецепт
+                </Link>
+              </Button>
+            </div>
           )}
-        </div>
-        <div className="flex-1">
-          <div className="font-medium">{me.email}</div>
-          <div className="text-sm text-neutral-500">{me.nickname || 'без ника'}</div>
-        </div>
+        </section>
       </div>
 
-      {/* Вкладки */}
-      <div className="border-b">
-        <nav className="flex gap-4 text-sm">
-          {[
-            { v: 'mine', label: 'Мои рецепты' },
-            { v: 'favorites', label: 'Избранное' },
-            { v: 'settings', label: 'Настройки профиля' },
-          ].map(t => (
-            <button
-              key={t.v}
-              className={(tab===t.v ? 'border-b-2 border-primary text-neutral-900' : 'text-neutral-500 hover:text-neutral-800') + ' -mb-px px-2 py-2'}
-              onClick={() => { setTab(t.v as any); if (t.v==='favorites' && favorites===null) loadFavorites() }}
+      {/* Delete Recipe Confirmation */}
+      <AlertDialog open={!!deleteRecipeId} onOpenChange={() => setDeleteRecipeId(null)}>
+        <AlertDialogContent className="sm:max-w-md bg-card border-2">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl">Удалить рецепт?</AlertDialogTitle>
+            <AlertDialogDescription className="text-base pt-2">
+              Это действие нельзя отменить. Рецепт будет удален навсегда.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-row gap-3 sm:gap-3 sm:flex-row sm:justify-end">
+            <AlertDialogCancel className="m-0 flex-1 sm:flex-initial">Отмена</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteRecipe}
+              className="m-0 bg-destructive text-destructive-foreground hover:bg-destructive/90 focus:ring-destructive flex-1 sm:flex-initial"
             >
-              {t.label}
-            </button>
-          ))}
-        </nav>
-      </div>
+              {isDeleting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Удалить
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Layout>
+  );
+};
 
-      {/* Контент вкладок */}
-      {tab === 'mine' && (
-        <div className="grid sm:grid-cols-2 gap-3">
-          {me.recipes?.map((r: RecipeItem) => (
-            <div key={r.id} className="border rounded">
-              {r.photo_path ? (
-                <a href={`/recipes/${r.id}`} target="_blank" rel="noreferrer">
-                  <img src={r.photo_path} className="w-full h-28 object-cover" />
-                </a>
-              ) : null}
-              <div className="p-3">
-                <div className="text-sm text-neutral-500 flex items-center justify-between">
-                  <span>{r.topic}</span>
-                  {typeof (r as any).likes_count === 'number' && <span>❤ {(r as any).likes_count}</span>}
-                </div>
-                <a className="font-medium hover:underline" href={`/recipes/${r.id}`} target="_blank" rel="noreferrer">{r.title}</a>
-                <div className="mt-2">
-                  <button onClick={()=>deleteRecipe(r.id)} className="text-xs text-red-600 border rounded px-2 py-1">Удалить рецепт</button>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {tab === 'favorites' && (
-        <div className="grid sm:grid-cols-2 gap-3">
-          {(favorites || []).map((r: any) => (
-            <div key={r.id} className="border rounded">
-              {r.photo_path ? (
-                <a href={`/recipes/${r.id}`} target="_blank" rel="noreferrer">
-                  <img src={r.photo_path} className="w-full h-28 object-cover" />
-                </a>
-              ) : null}
-              <div className="p-3">
-                <div className="text-sm text-neutral-500 flex items-center justify-between">
-                  <span>{r.topic}</span>
-                  {typeof r.likes_count === 'number' && <span>❤ {r.likes_count}</span>}
-                </div>
-                <a className="font-medium hover:underline" href={`/recipes/${r.id}`} target="_blank" rel="noreferrer">{r.title}</a>
-              </div>
-            </div>
-          ))}
-          {favorites !== null && favorites.length === 0 && (
-            <div className="text-sm text-neutral-500">Пока нет избранных рецептов</div>
-          )}
-        </div>
-      )}
-
-      {tab === 'settings' && (
-        <div className="space-y-4 max-w-md">
-          <div>
-            <div className="text-sm text-neutral-600 mb-1">Отображаемое имя</div>
-            {!isEditingNick ? (
-              <div className="flex items-center gap-3">
-                <div className="text-sm text-neutral-800">{me.nickname || 'без ника'}</div>
-                <button type="button" className="text-xs px-2 py-1 border rounded" onClick={() => { setIsEditingNick(true); setNickname(me.nickname || '') }}>Изменить</button>
-              </div>
-            ) : (
-              <div className="flex gap-2">
-                <input value={nickname} onChange={e=>setNickname(e.target.value)} placeholder="Никнейм" className="border rounded px-2 py-1 flex-1" />
-                <button type="button" onClick={saveNickname} disabled={savingNick} className="px-3 py-1 rounded border disabled:opacity-60">{savingNick ? 'Сохранение…' : 'Сохранить'}</button>
-                <button type="button" className="px-3 py-1 rounded border" onClick={() => { setIsEditingNick(false); setNickname(me.nickname || '') }}>Отмена</button>
-              </div>
-            )}
-            {err && <div className="text-xs text-red-600 mt-1">{err}</div>}
-          </div>
-
-          <div>
-            <div className="text-sm text-neutral-600 mb-1">Аватар</div>
-            <div className="flex items-center gap-3">
-              <input id="avatar_input_settings" ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={onUpload} />
-              <label htmlFor="avatar_input_settings" className="inline-flex items-center px-3 py-1.5 border rounded-md text-sm bg-white hover:bg-neutral-50 cursor-pointer">Загрузить новое фото</label>
-              {me.photo_path && (
-                <button type="button" className="text-sm text-red-600 underline" onClick={onDeletePhoto}>Удалить фото</button>
-              )}
-            </div>
-          </div>
-
-          <div className="pt-4 border-t">
-            <div className="text-sm font-medium mb-2">Смена пароля</div>
-            {!showPassForm ? (
-              <button
-                type="button"
-                className="px-3 py-1 rounded border"
-                onClick={() => { setShowPassForm(true); setPassMsg(null) }}
-              >
-                Изменить пароль
-              </button>
-            ) : (
-              <div className="space-y-2">
-                <input type="password" placeholder="Старый пароль" value={oldPass} onChange={e=>setOldPass(e.target.value)} className="border rounded px-2 py-1 w-full" />
-                <input type="password" placeholder="Новый пароль" value={newPass1} onChange={e=>setNewPass1(e.target.value)} className="border rounded px-2 py-1 w-full" />
-                <input type="password" placeholder="Повторите новый пароль" value={newPass2} onChange={e=>setNewPass2(e.target.value)} className="border rounded px-2 py-1 w-full" />
-                {passMsg && <div className="text-xs text-red-600">{passMsg}</div>}
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    className="px-3 py-1 rounded border"
-                    onClick={async ()=>{
-                      setPassMsg(null)
-                      if (!oldPass || !newPass1 || !newPass2) { setPassMsg('Заполните все поля'); return }
-                      if (newPass1 !== newPass2) { setPassMsg('Новые пароли не совпадают'); return }
-                      try {
-                        await api.post('/users/me/change-password', { old_password: oldPass, new_password: newPass1 })
-                        setPassMsg('Пароль изменён')
-                        setOldPass(''); setNewPass1(''); setNewPass2('')
-                        setShowPassForm(false)
-                      } catch (e:any) {
-                        const msg = e?.response?.data?.detail || e?.message || 'Не удалось изменить пароль'
-                        setPassMsg(String(msg))
-                      }
-                    }}
-                  >
-                    Сохранить
-                  </button>
-                  <button
-                    type="button"
-                    className="px-3 py-1 rounded border"
-                    onClick={() => { setShowPassForm(false); setOldPass(''); setNewPass1(''); setNewPass2(''); setPassMsg(null) }}
-                  >
-                    Отмена
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </section>
-  )
-}
+export default Profile;

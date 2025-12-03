@@ -39,7 +39,7 @@ export default function UserPublic() {
         <h2 className="font-semibold mb-2">Рецепты</h2>
         <div className="grid sm:grid-cols-2 gap-3">
           {u.recipes?.map((r:any) => (
-            <a key={r.id} className="border rounded block hover:shadow" href={`/recipes/${r.id}`} target="_blank" rel="noreferrer">
+            <a key={r.id} className="border rounded block hover:shadow" href={`/recipes/${r.id}`}>
               {r.photo_path && <img src={r.photo_path} className="w-full h-28 object-cover" />}
               <div className="p-3">
                 <div className="text-sm text-neutral-500 flex items-center justify-between">

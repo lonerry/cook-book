@@ -15,7 +15,7 @@ from backend.repositories.recipes import RecipeRepository
 from backend.repositories.users import UserRepository
 from backend.schemas.common import PhotoResponse
 from backend.schemas.user import ChangePasswordRequest
-from backend.services.storage import delete_file_by_url, upload_public_file
+from backend.services.storage import delete_file_by_url, upload_public_file, get_public_url_or_presigned
 
 
 async def get_me(db: AsyncSession, *, current_user: User) -> dict:
@@ -32,7 +32,7 @@ async def get_me(db: AsyncSession, *, current_user: User) -> dict:
                 "id": r.id,
                 "title": r.title,
                 "topic": r.topic.value if hasattr(r.topic, "value") else str(r.topic),
-                "photo_path": r.photo_path,
+                "photo_path": get_public_url_or_presigned(r.photo_path) if r.photo_path else None,
                 "description": r.description,
                 "ingredients": [
                     {"name": i.name, "quantity": i.quantity} for i in r.ingredients
@@ -47,7 +47,7 @@ async def get_me(db: AsyncSession, *, current_user: User) -> dict:
         "is_active": current_user.is_active,
         "nickname": current_user.nickname,
         "full_name": current_user.full_name,
-        "photo_path": current_user.photo_path,
+        "photo_path": get_public_url_or_presigned(current_user.photo_path) if current_user.photo_path else None,
         "recipes": recipes,
     }
 
@@ -73,7 +73,7 @@ async def get_public_profile(
                 "id": r.id,
                 "title": r.title,
                 "topic": r.topic.value if hasattr(r.topic, "value") else str(r.topic),
-                "photo_path": r.photo_path,
+                "photo_path": get_public_url_or_presigned(r.photo_path) if r.photo_path else None,
                 "likes_count": likes,
                 "liked_by_me": liked_by_me,
             }
@@ -83,7 +83,7 @@ async def get_public_profile(
         "email": user.email,
         "nickname": user.nickname,
         "full_name": user.full_name,
-        "photo_path": user.photo_path,
+        "photo_path": get_public_url_or_presigned(user.photo_path) if user.photo_path else None,
         "recipes": recipes,
     }
 
@@ -153,7 +153,8 @@ async def upload_avatar(
     url = upload_public_file(io.BytesIO(data), key)
     users_repo = UserRepository(db)
     user = await users_repo.update(current_user, {"photo_path": url})
-    return PhotoResponse(photo_path=user.photo_path)
+    # Return processed URL that's accessible
+    return PhotoResponse(photo_path=get_public_url_or_presigned(user.photo_path) if user.photo_path else None)
 
 
 async def delete_avatar(db: AsyncSession, *, current_user: User) -> dict:
