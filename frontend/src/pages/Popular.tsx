@@ -148,7 +148,7 @@ const Popular = () => {
             <TrendingUp className="h-4 w-4" />
             Топ рецептов
           </div>
-          <h1 className="font-display text-4xl md:text-5xl font-bold text-foreground animate-fade-up" style={{ animationDelay: '0.1s' }}>
+          <h1 className="font-sans text-4xl md:text-5xl font-bold text-foreground animate-fade-up" style={{ animationDelay: '0.1s' }}>
             Популярные рецепты
           </h1>
           <p className="text-lg text-muted-foreground max-w-xl mx-auto animate-fade-up" style={{ animationDelay: '0.2s' }}>

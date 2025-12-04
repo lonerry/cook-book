@@ -17,7 +17,20 @@ import { useToast } from '@/hooks/use-toast';
 const recipeSchema = z.object({
   title: z.string().min(1, 'Название обязательно').max(200, 'Максимум 200 символов'),
   description: z.string().optional(),
-  topic: z.enum(['breakfast', 'lunch', 'dinner'], { required_error: 'Выберите категорию' }),
+  topic: z.enum([
+    'breakfast', 
+    'lunch', 
+    'dinner', 
+    'desserts', 
+    'appetizers', 
+    'salads', 
+    'soups', 
+    'drinks', 
+    'baking', 
+    'snacks', 
+    'vegetarian', 
+    'quick'
+  ], { required_error: 'Выберите категорию' }),
   ingredients: z.array(
     z.object({
       name: z.string().min(1, 'Введите название'),
@@ -225,7 +238,7 @@ const CreateRecipe = () => {
           <Button variant="ghost" size="icon" onClick={() => navigate(-1)}>
             <ArrowLeft className="h-5 w-5" />
           </Button>
-          <h1 className="font-display text-3xl font-bold text-foreground">
+          <h1 className="font-sans text-3xl font-bold text-foreground">
             {isEditMode ? 'Редактировать рецепт' : 'Новый рецепт'}
           </h1>
         </div>
@@ -289,7 +302,7 @@ const CreateRecipe = () => {
                 <RadioGroup
                   value={field.value}
                   onValueChange={field.onChange}
-                  className="flex gap-4"
+                  className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3"
                 >
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="breakfast" id="breakfast" />
@@ -302,6 +315,42 @@ const CreateRecipe = () => {
                   <div className="flex items-center space-x-2">
                     <RadioGroupItem value="dinner" id="dinner" />
                     <Label htmlFor="dinner" className="cursor-pointer">Ужин</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="desserts" id="desserts" />
+                    <Label htmlFor="desserts" className="cursor-pointer">Десерты</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="appetizers" id="appetizers" />
+                    <Label htmlFor="appetizers" className="cursor-pointer">Закуски</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="salads" id="salads" />
+                    <Label htmlFor="salads" className="cursor-pointer">Салаты</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="soups" id="soups" />
+                    <Label htmlFor="soups" className="cursor-pointer">Супы</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="drinks" id="drinks" />
+                    <Label htmlFor="drinks" className="cursor-pointer">Напитки</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="baking" id="baking" />
+                    <Label htmlFor="baking" className="cursor-pointer">Выпечка</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="snacks" id="snacks" />
+                    <Label htmlFor="snacks" className="cursor-pointer">Перекусы</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="vegetarian" id="vegetarian" />
+                    <Label htmlFor="vegetarian" className="cursor-pointer">Вегетарианские</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="quick" id="quick" />
+                    <Label htmlFor="quick" className="cursor-pointer">Быстрые</Label>
                   </div>
                 </RadioGroup>
               )}

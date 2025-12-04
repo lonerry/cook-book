@@ -8,7 +8,7 @@ export const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Brand */}
           <div className="space-y-4">
-            <Link to="/" className="flex items-center gap-2 font-display text-xl font-bold text-foreground">
+            <Link to="/" className="flex items-center gap-2 font-sans text-xl font-bold text-foreground">
               <ChefHat className="h-6 w-6 text-primary" />
               CookBook
             </Link>

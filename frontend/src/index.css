@@ -105,23 +105,23 @@
   body {
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
-    font-family: 'Lora', serif;
+    font-family: 'Lato', sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
 
   h1, h2, h3, h4, h5, h6 {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Lato', sans-serif;
   }
 }
 
 @layer utilities {
   .font-display {
-    font-family: 'Playfair Display', serif;
+    font-family: 'Lato', sans-serif;
   }
 
   .font-sans {
-    font-family: 'Lora', serif;
+    font-family: 'Lato', sans-serif;
   }
 
   .gradient-primary {

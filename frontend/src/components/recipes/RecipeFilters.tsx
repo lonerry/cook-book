@@ -20,6 +20,15 @@ const topics = [
   { value: 'breakfast', label: 'Завтрак' },
   { value: 'lunch', label: 'Обед' },
   { value: 'dinner', label: 'Ужин' },
+  { value: 'desserts', label: 'Десерты' },
+  { value: 'appetizers', label: 'Закуски' },
+  { value: 'salads', label: 'Салаты' },
+  { value: 'soups', label: 'Супы' },
+  { value: 'drinks', label: 'Напитки' },
+  { value: 'baking', label: 'Выпечка' },
+  { value: 'snacks', label: 'Перекусы' },
+  { value: 'vegetarian', label: 'Вегетарианские' },
+  { value: 'quick', label: 'Быстрые' },
 ];
 
 const orders = [

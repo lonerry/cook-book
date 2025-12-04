@@ -192,7 +192,7 @@ const Index = () => {
       {/* Hero Section */}
       <section className="gradient-hero py-12 md:py-20">
         <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center space-y-4">
-          <h1 className="font-display text-4xl md:text-5xl lg:text-6xl font-bold text-foreground animate-fade-up">
+          <h1 className="font-sans text-4xl md:text-5xl lg:text-6xl font-bold text-foreground animate-fade-up">
             Откройте мир <span className="text-primary">вкусных</span> рецептов
           </h1>
           <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto animate-fade-up" style={{ animationDelay: '0.1s' }}>
@@ -248,7 +248,7 @@ const Index = () => {
         ) : (
           <div className="text-center py-16 space-y-4">
             <UtensilsCrossed className="h-16 w-16 mx-auto text-muted-foreground/50" />
-            <h3 className="font-display text-xl font-semibold text-foreground">
+            <h3 className="font-sans text-xl font-semibold text-foreground">
               Рецепты не найдены
             </h3>
             <p className="text-muted-foreground">

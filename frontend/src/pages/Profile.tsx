@@ -304,7 +304,7 @@ const Profile = () => {
 
             {/* Info */}
             <div className="flex-1 text-center md:text-left space-y-2">
-              <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground">
+              <h1 className="font-sans text-2xl md:text-3xl font-bold text-foreground">
                 {user.nickname || 'Пользователь'}
               </h1>
               <p className="text-muted-foreground">{user.email}</p>
@@ -312,11 +312,11 @@ const Profile = () => {
               {/* Stats */}
               <div className="flex justify-center md:justify-start gap-6 pt-4">
                 <div className="text-center">
-                  <p className="font-display text-2xl font-bold text-foreground">{recipes.length}</p>
+                  <p className="font-sans text-2xl font-bold text-foreground">{recipes.length}</p>
                   <p className="text-sm text-muted-foreground">Рецептов</p>
                 </div>
                 <div className="text-center">
-                  <p className="font-display text-2xl font-bold text-primary">{totalLikes}</p>
+                  <p className="font-sans text-2xl font-bold text-primary">{totalLikes}</p>
                   <p className="text-sm text-muted-foreground">Лайков</p>
                 </div>
               </div>
@@ -418,7 +418,7 @@ const Profile = () => {
         {/* My Recipes */}
         <section className="space-y-6">
           <div className="flex items-center justify-between">
-            <h2 className="font-display text-2xl font-semibold text-foreground">Мои рецепты</h2>
+            <h2 className="font-sans text-2xl font-semibold text-foreground">Мои рецепты</h2>
             <Button asChild>
               <Link to="/recipes/new">
                 <Plus className="h-4 w-4 mr-2" />

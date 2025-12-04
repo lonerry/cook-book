@@ -43,7 +43,7 @@ export const Header = ({ onSearch, searchQuery = '' }: HeaderProps) => {
     <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
       <div className="container mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex h-16 items-center justify-between gap-4">
         {/* Logo */}
-        <Link to="/" className="flex items-center gap-2 font-display text-xl font-bold text-foreground">
+        <Link to="/" className="flex items-center gap-2 font-sans text-xl font-bold text-foreground">
           <ChefHat className="h-7 w-7 text-primary" />
           <span className="hidden sm:inline">CookBook</span>
         </Link>

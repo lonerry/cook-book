@@ -58,13 +58,13 @@ const Login = () => {
         {/* Logo */}
         <Link to="/" className="flex items-center justify-center gap-2 mb-8">
           <ChefHat className="h-10 w-10 text-primary" />
-          <span className="font-display text-3xl font-bold text-foreground">CookBook</span>
+          <span className="font-sans text-3xl font-bold text-foreground">CookBook</span>
         </Link>
 
         {/* Form Card */}
         <div className="bg-card rounded-2xl shadow-card-hover p-8 space-y-6 animate-scale-in">
           <div className="text-center space-y-2">
-            <h1 className="font-display text-2xl font-bold text-foreground">Вход в аккаунт</h1>
+            <h1 className="font-sans text-2xl font-bold text-foreground">Вход в аккаунт</h1>
             <p className="text-muted-foreground">Рады видеть вас снова!</p>
           </div>
 

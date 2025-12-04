@@ -134,7 +134,7 @@ const UserProfile = () => {
     return (
       <Layout>
         <div className="container py-16 text-center">
-          <h1 className="font-display text-2xl font-bold mb-4">Пользователь не найден</h1>
+          <h1 className="font-sans text-2xl font-bold mb-4">Пользователь не найден</h1>
           <Button asChild>
             <Link to="/">Вернуться на главную</Link>
           </Button>
@@ -159,18 +159,18 @@ const UserProfile = () => {
 
             {/* Info */}
             <div className="flex-1 text-center md:text-left space-y-2">
-              <h1 className="font-display text-2xl md:text-3xl font-bold text-foreground">
+              <h1 className="font-sans text-2xl md:text-3xl font-bold text-foreground">
                 {user.nickname || 'Пользователь'}
               </h1>
 
               {/* Stats */}
               <div className="flex justify-center md:justify-start gap-6 pt-4">
                 <div className="text-center">
-                  <p className="font-display text-2xl font-bold text-foreground">{recipes.length}</p>
+                  <p className="font-sans text-2xl font-bold text-foreground">{recipes.length}</p>
                   <p className="text-sm text-muted-foreground">Рецептов</p>
                 </div>
                 <div className="text-center">
-                  <p className="font-display text-2xl font-bold text-primary">{totalLikes}</p>
+                  <p className="font-sans text-2xl font-bold text-primary">{totalLikes}</p>
                   <p className="text-sm text-muted-foreground">Лайков</p>
                 </div>
               </div>
@@ -180,7 +180,7 @@ const UserProfile = () => {
 
         {/* User Recipes */}
         <section className="space-y-6">
-          <h2 className="font-display text-2xl font-semibold text-foreground">
+          <h2 className="font-sans text-2xl font-semibold text-foreground">
             Рецепты пользователя
           </h2>
 

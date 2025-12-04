@@ -11,6 +11,15 @@ class TopicEnum(str, enum.Enum):
     breakfast = "breakfast"
     lunch = "lunch"
     dinner = "dinner"
+    desserts = "desserts"
+    appetizers = "appetizers"
+    salads = "salads"
+    soups = "soups"
+    drinks = "drinks"
+    baking = "baking"
+    snacks = "snacks"
+    vegetarian = "vegetarian"
+    quick = "quick"
 
 
 class Recipe(Base):

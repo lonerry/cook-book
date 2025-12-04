@@ -27,12 +27,30 @@ const topicLabels: Record<string, string> = {
   breakfast: 'Завтрак',
   lunch: 'Обед',
   dinner: 'Ужин',
+  desserts: 'Десерты',
+  appetizers: 'Закуски',
+  salads: 'Салаты',
+  soups: 'Супы',
+  drinks: 'Напитки',
+  baking: 'Выпечка',
+  snacks: 'Перекусы',
+  vegetarian: 'Вегетарианские',
+  quick: 'Быстрые',
 };
 
 const topicColors: Record<string, string> = {
   breakfast: 'bg-amber-100 text-amber-700 border-amber-200',
   lunch: 'bg-orange-100 text-orange-700 border-orange-200',
   dinner: 'bg-amber-100 text-amber-800 border-amber-300',
+  desserts: 'bg-pink-100 text-pink-700 border-pink-200',
+  appetizers: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  salads: 'bg-green-100 text-green-700 border-green-200',
+  soups: 'bg-blue-100 text-blue-700 border-blue-200',
+  drinks: 'bg-purple-100 text-purple-700 border-purple-200',
+  baking: 'bg-rose-100 text-rose-700 border-rose-200',
+  snacks: 'bg-indigo-100 text-indigo-700 border-indigo-200',
+  vegetarian: 'bg-emerald-100 text-emerald-700 border-emerald-200',
+  quick: 'bg-cyan-100 text-cyan-700 border-cyan-200',
 };
 
 const RecipeDetail = () => {
@@ -239,7 +257,7 @@ const RecipeDetail = () => {
     return (
       <Layout>
         <div className="container py-16 text-center">
-          <h1 className="font-display text-2xl font-bold mb-4">Рецепт не найден</h1>
+          <h1 className="font-sans text-2xl font-bold mb-4">Рецепт не найден</h1>
           <Button asChild>
             <Link to="/">Вернуться на главную</Link>
           </Button>
@@ -301,7 +319,7 @@ const RecipeDetail = () => {
                 </span>
               </div>
 
-              <h1 className="font-display text-3xl md:text-4xl font-bold text-foreground">
+              <h1 className="font-sans text-3xl md:text-4xl font-bold text-foreground">
                 {recipe.title}
               </h1>
 
@@ -384,7 +402,7 @@ const RecipeDetail = () => {
 
             {/* Ingredients */}
             <section className="space-y-4">
-              <h2 className="font-display text-2xl font-semibold text-foreground">Ингредиенты</h2>
+              <h2 className="font-sans text-2xl font-semibold text-foreground">Ингредиенты</h2>
               <div className="bg-secondary/50 rounded-xl p-6">
                 <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {recipe.ingredients.map((ingredient, index) => (
@@ -399,7 +417,7 @@ const RecipeDetail = () => {
 
             {/* Steps */}
             <section className="space-y-6">
-              <h2 className="font-display text-2xl font-semibold text-foreground">Приготовление</h2>
+              <h2 className="font-sans text-2xl font-semibold text-foreground">Приготовление</h2>
               <div className="space-y-6">
                 {recipe.steps?.map((step) => (
                   <div key={step.order_index} className="flex gap-4 animate-fade-up" style={{ animationDelay: `${step.order_index * 0.1}s` }}>
@@ -427,7 +445,7 @@ const RecipeDetail = () => {
 
             {/* Comments */}
             <section className="space-y-6 pt-8 border-t border-border">
-              <h2 className="font-display text-2xl font-semibold text-foreground">
+              <h2 className="font-sans text-2xl font-semibold text-foreground">
                 Комментарии ({comments.length})
               </h2>
 
