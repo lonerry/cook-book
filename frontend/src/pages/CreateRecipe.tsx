@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useForm, useFieldArray, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -56,6 +56,8 @@ const CreateRecipe = () => {
   const [coverImage, setCoverImage] = useState<File | null>(null);
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [stepImages, setStepImages] = useState<(File | string | null)[]>([]);
+  const [activeImageBlock, setActiveImageBlock] = useState<'cover' | number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const isEditMode = !!id;
 
   const {
@@ -143,20 +145,97 @@ const CreateRecipe = () => {
     loadRecipe();
   }, [id, isEditMode, setValue, navigate, toast]);
 
+  // Helper function to process image file
+  const processImageFile = useCallback((file: File, target: 'cover' | number) => {
+    if (!file.type.startsWith('image/')) {
+      toast({
+        title: 'Ошибка',
+        description: 'Пожалуйста, выберите изображение',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (target === 'cover') {
+      setCoverImage(file);
+      setCoverPreview(URL.createObjectURL(file));
+    } else {
+      setStepImages((prev) => {
+        const newStepImages = [...prev];
+        newStepImages[target] = file;
+        return newStepImages;
+      });
+    }
+  }, [toast]);
+
   const handleCoverChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      setCoverImage(file);
-      setCoverPreview(URL.createObjectURL(file));
+      processImageFile(file, 'cover');
     }
   };
 
   const handleStepImageChange = (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const newStepImages = [...stepImages];
-      newStepImages[index] = file;
-      setStepImages(newStepImages);
+      processImageFile(file, index);
+    }
+  };
+
+  // Handle paste from clipboard
+  useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      if (activeImageBlock === null) return;
+
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        if (item.type.startsWith('image/')) {
+          e.preventDefault();
+          const file = item.getAsFile();
+          if (file) {
+            processImageFile(file, activeImageBlock);
+          }
+          break;
+        }
+      }
+    };
+
+    document.addEventListener('paste', handlePaste);
+    return () => {
+      document.removeEventListener('paste', handlePaste);
+    };
+  }, [activeImageBlock, processImageFile]);
+
+  // Handle drag and drop
+  const handleDragOver = (e: React.DragEvent, target: 'cover' | number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setActiveImageBlock(target);
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    // Only hide dragging if we're leaving the element itself, not a child
+    if (e.currentTarget === e.target) {
+      setIsDragging(false);
+      setActiveImageBlock(null);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent, target: 'cover' | number) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    setActiveImageBlock(null);
+
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      processImageFile(file, target);
     }
   };
 
@@ -248,15 +327,36 @@ const CreateRecipe = () => {
           <div className="space-y-4">
             <Label>Обложка рецепта</Label>
             <div
-              className="relative aspect-video rounded-xl border-2 border-dashed border-border hover:border-primary/50 transition-colors cursor-pointer overflow-hidden bg-muted/30"
-              onClick={() => document.getElementById('cover-input')?.click()}
+              className={`relative aspect-video rounded-xl border-2 border-dashed transition-colors cursor-pointer overflow-hidden bg-muted/30 ${
+                isDragging && activeImageBlock === 'cover'
+                  ? 'border-primary border-solid bg-primary/5'
+                  : 'border-border hover:border-primary/50'
+              }`}
+              onClick={() => {
+                setActiveImageBlock('cover');
+                document.getElementById('cover-input')?.click();
+              }}
+              onFocus={() => setActiveImageBlock('cover')}
+              onBlur={() => setTimeout(() => setActiveImageBlock(null), 200)}
+              onDragOver={(e) => handleDragOver(e, 'cover')}
+              onDragLeave={handleDragLeave}
+              onDrop={(e) => handleDrop(e, 'cover')}
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setActiveImageBlock('cover');
+                  document.getElementById('cover-input')?.click();
+                }
+              }}
             >
               {coverPreview ? (
                 <img src={coverPreview} alt="Preview" className="w-full h-full object-cover" />
               ) : (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-muted-foreground">
                   <Upload className="h-10 w-10" />
-                  <span>Нажмите для загрузки фото</span>
+                  <span>Нажмите для загрузки или перетащите фото</span>
+                  <span className="text-xs">Или вставьте через Cmd+V</span>
                 </div>
               )}
               <input
@@ -462,7 +562,7 @@ const CreateRecipe = () => {
                             ? URL.createObjectURL(stepImages[index] as File)
                             : stepImages[index] as string}
                           alt={`Step ${index + 1}`}
-                          className="max-h-48 rounded-lg object-cover"
+                          className="max-h-48 rounded-lg object-cover w-full"
                           onError={(e) => {
                             // Hide image if it fails to load
                             (e.target as HTMLImageElement).style.display = 'none';
@@ -483,15 +583,48 @@ const CreateRecipe = () => {
                         </Button>
                       </div>
                     ) : (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => document.getElementById(`step-image-${index}`)?.click()}
+                      <div
+                        className={`border-2 border-dashed rounded-lg p-4 transition-colors cursor-pointer ${
+                          isDragging && activeImageBlock === index
+                            ? 'border-primary border-solid bg-primary/5'
+                            : 'border-border hover:border-primary/50'
+                        }`}
+                        onClick={() => {
+                          setActiveImageBlock(index);
+                          document.getElementById(`step-image-${index}`)?.click();
+                        }}
+                        onFocus={() => setActiveImageBlock(index)}
+                        onBlur={() => setTimeout(() => setActiveImageBlock(null), 200)}
+                        onDragOver={(e) => handleDragOver(e, index)}
+                        onDragLeave={handleDragLeave}
+                        onDrop={(e) => handleDrop(e, index)}
+                        tabIndex={0}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setActiveImageBlock(index);
+                            document.getElementById(`step-image-${index}`)?.click();
+                          }
+                        }}
                       >
-                        <Upload className="h-4 w-4 mr-2" />
-                        Добавить фото (опционально)
-                      </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="w-full"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setActiveImageBlock(index);
+                            document.getElementById(`step-image-${index}`)?.click();
+                          }}
+                        >
+                          <Upload className="h-4 w-4 mr-2" />
+                          Добавить фото (опционально)
+                        </Button>
+                        <p className="text-xs text-muted-foreground text-center mt-2">
+                          Перетащите фото или вставьте через Cmd+V
+                        </p>
+                      </div>
                     )}
                   </div>
                 </div>

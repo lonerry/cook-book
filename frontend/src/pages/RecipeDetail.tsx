@@ -403,12 +403,13 @@ const RecipeDetail = () => {
             {/* Ingredients */}
             <section className="space-y-4">
               <h2 className="font-sans text-2xl font-semibold text-foreground">Ингредиенты</h2>
-              <div className="bg-secondary/50 rounded-xl p-6">
-                <ul className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="bg-secondary/50 rounded-xl p-6 max-w-md">
+                <ul className="space-y-2">
                   {recipe.ingredients.map((ingredient, index) => (
-                    <li key={index} className="flex items-center justify-between py-2 border-b border-border/50 last:border-0">
+                    <li key={index} className="flex items-center gap-2 py-1.5 border-b border-border/30 last:border-0">
                       <span className="text-foreground">{ingredient.name}</span>
-                      <span className="text-muted-foreground font-medium">{ingredient.quantity}</span>
+                      <span className="flex-1 border-b border-dotted border-muted-foreground/30 mx-1" />
+                      <span className="text-primary font-medium whitespace-nowrap">{ingredient.quantity}</span>
                     </li>
                   ))}
                 </ul>

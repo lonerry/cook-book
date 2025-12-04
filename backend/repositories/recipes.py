@@ -23,7 +23,13 @@ class RecipeRepository(CRUDRepository[Recipe]):
         if topic is not None:
             stmt = stmt.where(Recipe.topic == topic)
         if q:
-            query = func.plainto_tsquery("russian", q)
+            # Очищаем запрос от лишних символов
+            q_clean = q.strip()
+            if not q_clean:
+                return []
+            
+            # Full-text search по заголовку и описанию
+            query = func.plainto_tsquery("russian", q_clean)
             tsv_recipe = func.to_tsvector(
                 "russian",
                 func.concat_ws(
@@ -34,6 +40,7 @@ class RecipeRepository(CRUDRepository[Recipe]):
             )
             cond_recipe = tsv_recipe.op("@@")(query)
 
+            # Full-text search по ингредиентам
             tsv_ing = func.to_tsvector(
                 "russian", func.coalesce(RecipeIngredient.name, "")
             )
@@ -44,24 +51,25 @@ class RecipeRepository(CRUDRepository[Recipe]):
                 .where(tsv_ing.op("@@")(query))
             )
 
-            # Fallback to ILIKE for partials when tsquery finds nothing or for non‑indexed cases
-            ilike = or_(
-                Recipe.title.ilike(f"%{q}%"), Recipe.description.ilike(f"%{q}%")
-            )
+            # ILIKE поиск - только по заголовку и ингредиентам (убрали описание и шаги для более точного поиска)
+            ilike_title = Recipe.title.ilike(f"%{q_clean}%")
             ilike_ing = exists(
                 select(1)
                 .select_from(RecipeIngredient)
                 .where(RecipeIngredient.recipe_id == Recipe.id)
-                .where(RecipeIngredient.name.ilike(f"%{q}%"))
-            )
-            ilike_step = exists(
-                select(1)
-                .select_from(RecipeStep)
-                .where(RecipeStep.recipe_id == Recipe.id)
-                .where(RecipeStep.text.ilike(f"%{q}%"))
+                .where(RecipeIngredient.name.ilike(f"%{q_clean}%"))
             )
 
-            stmt = stmt.where(or_(cond_recipe, cond_ing, ilike, ilike_ing, ilike_step))
+            # Объединяем условия: full-text search ИЛИ ILIKE
+            # Ищем в заголовке, ингредиентах (через full-text или ILIKE)
+            search_condition = or_(
+                cond_recipe,  # Full-text по заголовку/описанию
+                cond_ing,     # Full-text по ингредиентам
+                ilike_title,  # ILIKE по заголовку
+                ilike_ing,    # ILIKE по ингредиентам
+            )
+
+            stmt = stmt.where(search_condition)
         if (order or "").lower() == "asc":
             stmt = stmt.order_by(Recipe.created_at.asc())
         else:

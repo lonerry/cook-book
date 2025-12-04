@@ -66,8 +66,8 @@ class RecipeIngredient(Base):
         nullable=False,
         index=True,
     )
-    name = Column(String(100), nullable=False)
-    quantity = Column(String(50), nullable=False)
+    name = Column(String(255), nullable=False)
+    quantity = Column(String(255), nullable=False)
 
     recipe = relationship("Recipe", back_populates="ingredients", lazy="selectin")
 

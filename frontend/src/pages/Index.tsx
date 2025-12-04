@@ -12,6 +12,7 @@ const Index = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const [recipes, setRecipes] = useState<Recipe[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
   const [likingIds, setLikingIds] = useState<Set<number>>(new Set());
   const { isAuthenticated } = useAuth();
 
@@ -21,7 +22,11 @@ const Index = () => {
 
   useEffect(() => {
     const fetchRecipes = async () => {
-      setIsLoading(true);
+      // Показываем загрузку только при первой загрузке
+      if (isInitialLoad) {
+        setIsLoading(true);
+      }
+      
       try {
         const data = await recipesApi.getAll({
           topic: selectedTopic || undefined,
@@ -31,98 +36,18 @@ const Index = () => {
         setRecipes(data);
       } catch (error) {
         console.error('Failed to fetch recipes:', error);
-        // Demo data for preview
-        setRecipes([
-          {
-            id: 1,
-            title: 'Пушистые панкейки с кленовым сиропом',
-            description: 'Идеальный завтрак для всей семьи',
-            topic: 'breakfast',
-            photo_path: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=800',
-            ingredients: [],
-            steps: [],
-            author: { id: 1, email: 'chef@example.com', nickname: 'MasterChef' },
-            likes_count: 42,
-            liked_by_me: false,
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: 2,
-            title: 'Паста Карбонара по-итальянски',
-            description: 'Классический рецепт из Рима',
-            topic: 'lunch',
-            photo_path: 'https://images.unsplash.com/photo-1612874742237-6526221588e3?w=800',
-            ingredients: [],
-            steps: [],
-            author: { id: 2, email: 'italia@example.com', nickname: 'ItalianCook', created_at: '' },
-            likes_count: 128,
-            is_liked: true,
-            created_at: new Date(Date.now() - 86400000).toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: 3,
-            title: 'Стейк Рибай с травяным маслом',
-            description: 'Сочный стейк средней прожарки',
-            topic: 'dinner',
-            photo_path: 'https://images.unsplash.com/photo-1600891964092-4316c288032e?w=800',
-            ingredients: [],
-            steps: [],
-            author: { id: 3, email: 'grill@example.com', nickname: 'GrillMaster', created_at: '' },
-            likes_count: 89,
-            is_liked: false,
-            created_at: new Date(Date.now() - 172800000).toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: 4,
-            title: 'Авокадо-тост с яйцом пашот',
-            description: 'Здоровый и питательный завтрак',
-            topic: 'breakfast',
-            photo_path: 'https://images.unsplash.com/photo-1525351484163-7529414344d8?w=800',
-            ingredients: [],
-            steps: [],
-            author: { id: 1, email: 'chef@example.com', nickname: 'MasterChef' },
-            likes_count: 67,
-            is_liked: false,
-            created_at: new Date(Date.now() - 259200000).toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: 5,
-            title: 'Том Ям с креветками',
-            description: 'Острый тайский суп',
-            topic: 'lunch',
-            photo_path: 'https://images.unsplash.com/photo-1569718212165-3a8278d5f624?w=800',
-            ingredients: [],
-            steps: [],
-            author: { id: 4, email: 'thai@example.com', nickname: 'ThaiChef', created_at: '' },
-            likes_count: 156,
-            is_liked: true,
-            created_at: new Date(Date.now() - 345600000).toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-          {
-            id: 6,
-            title: 'Тирамису классический',
-            description: 'Нежный итальянский десерт',
-            topic: 'dinner',
-            photo_path: 'https://images.unsplash.com/photo-1571877227200-a0d98ea607e9?w=800',
-            ingredients: [],
-            steps: [],
-            author: { id: 2, email: 'italia@example.com', nickname: 'ItalianCook', created_at: '' },
-            likes_count: 203,
-            is_liked: false,
-            created_at: new Date(Date.now() - 432000000).toISOString(),
-            updated_at: new Date().toISOString(),
-          },
-        ]);
+        // При ошибке просто оставляем пустой список при первой загрузке
+        if (isInitialLoad) {
+          setRecipes([]);
+        }
       } finally {
         setIsLoading(false);
+        setIsInitialLoad(false);
       }
     };
 
     fetchRecipes();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTopic, selectedOrder, searchQuery]);
 
   const handleSearch = (query: string) => {

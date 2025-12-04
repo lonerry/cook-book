@@ -55,84 +55,54 @@ const Profile = () => {
       return;
     }
 
-    const fetchRecipes = async () => {
-      if (!user) return;
-      
+    if (!user?.id) return;
+
+    let isMounted = true;
+
+    const fetchData = async () => {
       setIsLoading(true);
       try {
-        // Получаем данные пользователя, которые включают рецепты
-        const userData = await authApi.getCurrentUser();
-        if (userData.recipes) {
-          // Добавляем author_id и author к рецептам, если их нет
-          const recipesWithAuthor = userData.recipes.map((recipe: any) => ({
-            ...recipe,
-            author_id: recipe.author_id || user.id,
-            author: recipe.author || {
-              id: user.id,
-              email: user.email,
-              nickname: user.nickname,
-              photo_path: user.photo_path,
-            },
-            created_at: recipe.created_at || new Date().toISOString(),
-          }));
-          setRecipes(recipesWithAuthor);
-        } else {
+        // Получаем рецепты пользователя через API
+        const recipesData = await usersApi.getRecipes(user.id);
+        
+        if (!isMounted) return;
+        
+        // Убеждаемся, что у каждого рецепта есть author_id и author
+        const recipesWithAuthor = recipesData.map((recipe) => ({
+          ...recipe,
+          author_id: recipe.author_id || user.id,
+          author: recipe.author || {
+            id: user.id,
+            email: user.email,
+            nickname: user.nickname,
+            photo_path: user.photo_path,
+          },
+        }));
+        
+        setRecipes(recipesWithAuthor);
+      } catch (error) {
+        console.error('Failed to fetch data:', error);
+        if (isMounted) {
+          toast({
+            title: 'Ошибка',
+            description: 'Не удалось загрузить данные профиля',
+            variant: 'destructive',
+          });
           setRecipes([]);
         }
-      } catch (error) {
-        console.error('Failed to fetch recipes:', error);
-        // Demo data
-        setRecipes([
-          {
-            id: 1,
-            author_id: user.id,
-            title: 'Мой любимый рецепт панкейков',
-            description: 'Быстрый и вкусный завтрак',
-            topic: 'breakfast',
-            photo_path: 'https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?w=800',
-            ingredients: [],
-            steps: [],
-            author: { id: user.id, email: user.email, nickname: user.nickname, photo_path: user.photo_path },
-            likes_count: 42,
-            liked_by_me: false,
-            created_at: new Date().toISOString(),
-          },
-          {
-            id: 2,
-            author_id: user.id,
-            title: 'Домашняя паста',
-            description: 'Рецепт из Италии',
-            topic: 'lunch',
-            photo_path: 'https://images.unsplash.com/photo-1612874742237-6526221588e3?w=800',
-            ingredients: [],
-            steps: [],
-            author: { id: user.id, email: user.email, nickname: user.nickname, photo_path: user.photo_path },
-            likes_count: 28,
-            liked_by_me: true,
-            created_at: new Date(Date.now() - 86400000).toISOString(),
-          },
-          {
-            id: 3,
-            author_id: user.id,
-            title: 'Куриный суп с лапшой',
-            description: 'Традиционный домашний рецепт',
-            topic: 'dinner',
-            photo_path: 'https://images.unsplash.com/photo-1547592166-23ac45744acd?w=800',
-            ingredients: [],
-            steps: [],
-            author: { id: user.id, email: user.email, nickname: user.nickname, photo_path: user.photo_path },
-            likes_count: 35,
-            liked_by_me: false,
-            created_at: new Date(Date.now() - 172800000).toISOString(),
-          },
-        ]);
       } finally {
-        setIsLoading(false);
+        if (isMounted) {
+          setIsLoading(false);
+        }
       }
     };
 
-    fetchRecipes();
-  }, [user, isAuthenticated, navigate]);
+    fetchData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, isAuthenticated, navigate]);
 
   const handleSaveProfile = async () => {
     setIsSaving(true);
@@ -191,12 +161,27 @@ const Profile = () => {
   };
 
   const handleDeleteRecipe = async () => {
-    if (!deleteRecipeId) return;
+    if (!deleteRecipeId || !user?.id) return;
     
     setIsDeleting(true);
     try {
       await recipesApi.delete(deleteRecipeId);
-      setRecipes((prev) => prev.filter((r) => r.id !== deleteRecipeId));
+      
+      // Перезагружаем список рецептов с сервера, чтобы получить актуальные данные
+      // (лайки удаляются каскадно в БД, нужно обновить статистику)
+      const recipesData = await usersApi.getRecipes(user.id);
+      const recipesWithAuthor = recipesData.map((recipe) => ({
+        ...recipe,
+        author_id: recipe.author_id || user.id,
+        author: recipe.author || {
+          id: user.id,
+          email: user.email,
+          nickname: user.nickname,
+          photo_path: user.photo_path,
+        },
+      }));
+      setRecipes(recipesWithAuthor);
+      
       toast({ title: 'Рецепт удален' });
     } catch (error) {
       toast({

@@ -59,10 +59,10 @@ export const RecipeCard = ({ recipe, onLike, isLiking }: RecipeCardProps) => {
   };
 
   return (
-    <article className="group relative bg-card rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1">
-      <Link to={`/recipes/${recipe.id}`}>
+    <article className="group relative bg-card rounded-xl overflow-hidden shadow-card hover:shadow-card-hover transition-all duration-300 hover:-translate-y-1 h-full flex flex-col">
+      <Link to={`/recipes/${recipe.id}`} className="flex flex-col h-full">
         {/* Image */}
-        <div className="aspect-[4/3] overflow-hidden bg-muted relative">
+        <div className="aspect-[4/3] overflow-hidden bg-muted relative flex-shrink-0">
           {(() => {
             const imageUrl = normalizeImageUrl(recipe.photo_path);
             return imageUrl ? (
@@ -91,9 +91,9 @@ export const RecipeCard = ({ recipe, onLike, isLiking }: RecipeCardProps) => {
         </div>
 
         {/* Content */}
-        <div className="p-4 space-y-3">
+        <div className="p-4 space-y-3 flex flex-col flex-1">
           {/* Category & Date */}
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center justify-between gap-2 flex-shrink-0">
             <Badge variant="outline" className={cn('text-xs', topicColors[recipe.topic])}>
               {topicLabels[recipe.topic]}
             </Badge>
@@ -104,43 +104,45 @@ export const RecipeCard = ({ recipe, onLike, isLiking }: RecipeCardProps) => {
           </div>
 
           {/* Title */}
-          <h3 className="font-sans text-lg font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors">
+          <h3 className="font-sans text-lg font-semibold text-foreground line-clamp-2 group-hover:text-primary transition-colors flex-shrink-0 min-h-[3.5rem]">
             {recipe.title}
           </h3>
 
           {/* Author */}
-          {recipe.author ? (
-            <Link
-              to={`/users/${recipe.author.id}`}
-              onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-            >
-              <Avatar className="h-6 w-6">
-                <AvatarImage src={recipe.author.photo_path} />
-                <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                  {recipe.author.nickname?.[0] || recipe.author.email?.[0]?.toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-sm text-muted-foreground truncate">
-                {recipe.author.nickname || recipe.author.email}
-              </span>
-            </Link>
-          ) : recipe.author_id ? (
-            <Link
-              to={`/users/${recipe.author_id}`}
-              onClick={(e) => e.stopPropagation()}
-              className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-            >
-              <Avatar className="h-6 w-6">
-                <AvatarFallback className="text-xs bg-primary/10 text-primary">
-                  <User className="h-3 w-3" />
-                </AvatarFallback>
-              </Avatar>
-              <span className="text-sm text-muted-foreground truncate">
-                Автор
-              </span>
-            </Link>
-          ) : null}
+          <div className="mt-auto flex-shrink-0">
+            {recipe.author ? (
+              <Link
+                to={`/users/${recipe.author.id}`}
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+              >
+                <Avatar className="h-6 w-6">
+                  <AvatarImage src={recipe.author.photo_path} />
+                  <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                    {recipe.author.nickname?.[0] || recipe.author.email?.[0]?.toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-sm text-muted-foreground truncate">
+                  {recipe.author.nickname || recipe.author.email}
+                </span>
+              </Link>
+            ) : recipe.author_id ? (
+              <Link
+                to={`/users/${recipe.author_id}`}
+                onClick={(e) => e.stopPropagation()}
+                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+              >
+                <Avatar className="h-6 w-6">
+                  <AvatarFallback className="text-xs bg-primary/10 text-primary">
+                    <User className="h-3 w-3" />
+                  </AvatarFallback>
+                </Avatar>
+                <span className="text-sm text-muted-foreground truncate">
+                  Автор
+                </span>
+              </Link>
+            ) : null}
+          </div>
         </div>
       </Link>
 
