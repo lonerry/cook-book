@@ -60,8 +60,6 @@ class RecipeRepository(CRUDRepository[Recipe]):
                 .where(RecipeIngredient.name.ilike(f"%{q_clean}%"))
             )
 
-            # Объединяем условия: full-text search ИЛИ ILIKE
-            # Ищем в заголовке, ингредиентах (через full-text или ILIKE)
             search_condition = or_(
                 cond_recipe,  # Full-text по заголовку/описанию
                 cond_ing,     # Full-text по ингредиентам
